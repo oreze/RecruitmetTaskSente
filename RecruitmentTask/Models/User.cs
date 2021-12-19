@@ -12,7 +12,8 @@ namespace RecruitmentTask
         public User Parent { get; set; }
         public IList<User> Childs { get; set; }
 
-        public int ChildrenWithoutChildren()
+        
+        public int GetChildrenWithoutChildren()
         {
             var queue = new Queue<User>();
             queue.Enqueue(this);
@@ -21,7 +22,7 @@ namespace RecruitmentTask
             while (queue.Count != 0)
             {
                 var current = queue.Dequeue();
-                count += CountChildrenWithoutChildren(current.Childs);
+                count += GetChildrenWithoutChildrenCount(current.Childs);
                 foreach (var child in current.Childs)
                 {
                     queue.Enqueue(child);
@@ -31,7 +32,7 @@ namespace RecruitmentTask
             return count;
         }
 
-        private int CountChildrenWithoutChildren(IList<User> children)
+        private int GetChildrenWithoutChildrenCount(IList<User> children)
         {
             var count = 0;
             foreach (var child in children)

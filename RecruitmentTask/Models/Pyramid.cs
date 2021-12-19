@@ -1,9 +1,9 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Xml;
 
-namespace RecruitmentTask
+namespace RecruitmentTask.Models
 {
     public class Pyramid
     {
@@ -15,9 +15,58 @@ namespace RecruitmentTask
         {
             PyramidStructure = pyramid;
             TransfersStructure = transfers;
-            InitializePyramid();
+            SetRootUser();
             ApplyTransfers();
-            LevelOrderTraversal();
+        }
+        
+        public void PrintUsersDataInOrder()
+        {
+            var allUsers = new List<User>();
+            var queue = new Queue<User>();
+            allUsers.Add(Root);
+            queue.Enqueue(Root);
+
+            while (queue.Count != 0)
+            {
+                var current = queue.Dequeue();
+                
+                foreach (var child in current.Childs)
+                {
+                    queue.Enqueue(child);
+                    allUsers.Add(child);
+                }
+            }
+            
+            allUsers.OrderBy(x => x.Id).ToList().ForEach(PrintDataForUser);
+        }
+
+        private void PrintDataForUser(User user)
+        {
+            Console.WriteLine($"{user.Id} {user.Level} {user.GetChildrenWithoutChildren()} {user.Commission}");
+        }
+
+        private void SetRootUser()
+        {
+            var rootUser = PyramidStructure.SelectSingleNode("piramida/uczestnik");
+
+            Root = new()
+            {
+                Id = 1,
+                Level = 0,
+                Commission = 0,
+                Parent = null,
+                Childs = new List<User>()
+            };
+
+            InitializePyramidWithRoot(rootUser);
+        }
+
+        private void InitializePyramidWithRoot(XmlNode rootUser)
+        {
+            foreach (XmlNode item in rootUser.ChildNodes)
+            {
+                ParseNodeToUser(Root, item);
+            }           
         }
 
         private void ApplyTransfers()
@@ -34,20 +83,20 @@ namespace RecruitmentTask
                     Amount = Convert.ToDecimal(item.Attributes["kwota"].Value)
                 };
 
-                var user = Find(Root, transfer.From);
-                if (user != null)
-                {
-                    var parents = GetAllParentsFromRootToUser(user);
-                    Pay(parents, transfer.Amount);
-                }
+                CalculateFeesForTransfer(transfer);
             }
         }
 
-        /// <summary>
-        /// Pays users their commision 
-        /// </summary>
-        /// <param name="user">Users to pay off</param>
-        /// <param name="amount">The money we have to pay them off</param>
+        private void CalculateFeesForTransfer(Transfer transfer)
+        {
+            var user = Find(Root, transfer.From);
+            if (user != null)
+            {
+                var parents = GetAllParentsFromRootToUser(user);
+                Pay(parents, transfer.Amount);
+            }
+        }
+        
         private void Pay(IList<User> users, decimal amount) 
         {
             for (int i = 0; i < users.Count; i++)
@@ -60,61 +109,6 @@ namespace RecruitmentTask
                     amount -= amountToPay;
                     users[i].Commission += amountToPay;
                 }
-            }
-        }
-
-        private IList<User> GetAllParentsFromRootToUser(User user)
-        {
-            var parents = new List<User>();
-
-            var parent = user.Parent;
-            while (parent is not null)
-            {
-                parents.Add(parent);
-                parent = parent.Parent;
-            }
-
-            parents.Reverse();
-            return parents;
-        }
-        
-        public void LevelOrderTraversal()
-        {
-            var queue = new Queue<User>();
-            queue.Enqueue(Root);
-
-            while (queue.Count != 0)
-            {
-                var current = queue.Dequeue();
-                Console.WriteLine($"{current.Id} {current.Level} {current.ChildrenWithoutChildren()} {current.Commission}");
-                foreach (var child in current.Childs)
-                {
-                    queue.Enqueue(child);
-                }
-            }
-        }
-
-        private void InitializePyramid()
-        {
-            SetRootUser();
-        }
-
-        private void SetRootUser()
-        {
-            var rootUser = PyramidStructure.SelectSingleNode("piramida/uczestnik");
-
-            Root = new()
-            {
-                Id = 1,
-                Level = 0,
-                Commission = 0,
-                Parent = null,
-                Childs = new List<User>()
-            };
-
-            foreach (XmlNode item in rootUser.ChildNodes)
-            {
-                ParseNodeToUser(Root, item);
             }
         }
 
@@ -135,6 +129,21 @@ namespace RecruitmentTask
             {
                 ParseNodeToUser(user, item);
             }
+        }
+        
+        private IList<User> GetAllParentsFromRootToUser(User user)
+        {
+            var userParents = new List<User>();
+            var parent = user.Parent;
+            
+            while (parent is not null)
+            {
+                userParents.Add(parent);
+                parent = parent.Parent;
+            }
+
+            userParents.Reverse();
+            return userParents;
         }
         private User Find(User user, int indexToFind)
         {
